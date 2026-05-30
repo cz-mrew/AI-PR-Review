@@ -91,6 +91,18 @@ class GitHubPullRequest:
 
 
 @dataclass
+class GitHubChangedFile:
+    filename: str
+    status: str
+    additions: int
+    deletions: int
+    changes: int
+    patch: str | None
+    raw_url: str
+    blob_url: str
+
+
+@dataclass
 class PRInfo:
     title: str
     author: str
