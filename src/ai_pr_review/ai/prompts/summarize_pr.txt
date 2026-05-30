@@ -1,0 +1,23 @@
+你是一位资深代码审查专家。请分析以下 Pull Request 并提供简洁的总结。
+
+## PR 信息
+- 标题：{{ pr_title }}
+- 作者：{{ pr_author }}
+- 描述：{{ pr_description }}
+
+## 变更概览
+- 文件变更数：{{ files_changed }}
+- 新增行数：{{ additions }}
+- 删除行数：{{ deletions }}
+
+## Commit 信息
+{{ commit_messages }}
+
+## Diff 内容
+{{ diff_context }}
+
+请提供以下内容：
+1. **主要目的**：这个 PR 的主要目的是什么？
+2. **关键变更**：最重要的修改是什么？
+3. **影响范围**：哪些组件或模块会受到影响？
+4. **Review 重点**：审查者应重点关注哪些方面？
