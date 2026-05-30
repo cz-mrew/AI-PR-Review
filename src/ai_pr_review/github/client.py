@@ -1,6 +1,7 @@
 import os
 import re
 import httpx
+
 from .models import PRInfo, FileChange
 from .parser import parse_file_change, parse_github_pr_url
 
@@ -21,10 +22,12 @@ SKIP_PATTERNS = [
 
 
 class GitHubClient:
-    def __init__(self, token: str | None = None):
-        self._token = token or os.environ.get("GITHUB_TOKEN", "")
+    def __init__(self, github_token: str | None = None, token: str | None = None):
+        self._token = github_token if github_token is not None else token
+        if self._token is None:
+            self._token = os.environ.get("GITHUB_TOKEN", "")
         self._headers = {
-            "Accept": "application/vnd.github.v3+json",
+            "Accept": "application/vnd.github+json",
             "User-Agent": "ai-pr-review",
         }
         if self._token:
@@ -35,22 +38,17 @@ class GitHubClient:
         parsed = parse_github_pr_url(pr_url)
         return parsed.owner, parsed.repo, parsed.pull_number
 
+    def _get(self, path: str, params: dict | None = None) -> dict | list:
+        url = f"{GITHUB_API_BASE}/{path.lstrip('/')}"
+        with httpx.Client(timeout=30) as client:
+            response = client.get(url, headers=self._headers, params=params)
+            response.raise_for_status()
+            return response.json()
+
     def fetch_pr(self, pr_url: str) -> PRInfo:
         owner, repo, number = self.parse_pr_url(pr_url)
-        with httpx.Client(timeout=30) as client:
-            pr_resp = client.get(
-                f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{number}",
-                headers=self._headers,
-            )
-            pr_resp.raise_for_status()
-            pr_data = pr_resp.json()
-
-            files_resp = client.get(
-                f"{GITHUB_API_BASE}/repos/{owner}/{repo}/pulls/{number}/files",
-                headers=self._headers,
-            )
-            files_resp.raise_for_status()
-            files_data = files_resp.json()
+        pr_data = self._get(f"repos/{owner}/{repo}/pulls/{number}")
+        files_data = self._get(f"repos/{owner}/{repo}/pulls/{number}/files")
 
         return PRInfo(
             title=pr_data.get("title", ""),
