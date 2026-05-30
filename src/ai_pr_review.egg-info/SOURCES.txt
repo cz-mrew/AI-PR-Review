@@ -13,8 +13,11 @@ src/ai_pr_review/github/__init__.py
 src/ai_pr_review/github/client.py
 src/ai_pr_review/github/models.py
 src/ai_pr_review/github/parser.py
+src/ai_pr_review/review/__init__.py
+src/ai_pr_review/review/models.py
 src/ai_pr_review/schemas/__init__.py
 src/ai_pr_review/schemas/response.py
 src/ai_pr_review/utils/__init__.py
 src/ai_pr_review/utils/logger.py
 tests/test_github_parser.py
+tests/test_review_models.py
