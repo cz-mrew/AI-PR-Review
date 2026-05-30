@@ -76,3 +76,93 @@ def detect_path_risks(files: list[FileChange]) -> list[ReviewRisk]:
                 ))
                 break
     return risks
+
+
+_KEYWORD_RULES: list[tuple[str, RiskLevel, RiskCategory, str, str]] = [
+    (
+        "exec(", RiskLevel.HIGH, RiskCategory.SECURITY,
+        "检测到 exec() 调用，存在代码注入风险",
+        "避免使用 exec()，改用更安全的替代方案。如确需动态执行，请严格校验输入",
+    ),
+    (
+        "eval(", RiskLevel.HIGH, RiskCategory.SECURITY,
+        "检测到 eval() 调用，存在代码注入风险",
+        "避免使用 eval()，改用 ast.literal_eval 或其他安全解析方式",
+    ),
+    (
+        "shell=True", RiskLevel.HIGH, RiskCategory.SECURITY,
+        "检测到 shell=True 参数，存在命令注入风险",
+        "避免使用 shell=True，使用列表形式传递参数以减少注入风险",
+    ),
+    (
+        "subprocess", RiskLevel.MEDIUM, RiskCategory.SECURITY,
+        "检测到 subprocess 调用，需确认输入安全性",
+        "请检查 subprocess 调用的参数是否来自外部输入，避免命令注入",
+    ),
+    (
+        "password", RiskLevel.MEDIUM, RiskCategory.SECURITY,
+        "检测到 password 关键词，需确认密码处理方式",
+        "请检查密码是否被硬编码、是否使用安全存储、是否在日志中泄露",
+    ),
+    (
+        "secret", RiskLevel.HIGH, RiskCategory.SECURITY,
+        "检测到 secret 关键词，需确认密钥处理方式",
+        "请检查密钥是否被硬编码，应使用环境变量或密钥管理服务",
+    ),
+    (
+        "token", RiskLevel.MEDIUM, RiskCategory.SECURITY,
+        "检测到 token 关键词，需确认令牌处理方式",
+        "请检查令牌是否安全存储和传输，避免在日志或错误信息中泄露",
+    ),
+    (
+        "drop table", RiskLevel.HIGH, RiskCategory.LOGIC,
+        "检测到 DROP TABLE 语句，存在数据破坏风险",
+        "请确认该操作是否为预期行为，是否在事务中执行，是否有备份和回滚方案",
+    ),
+    (
+        "delete from", RiskLevel.MEDIUM, RiskCategory.LOGIC,
+        "检测到 DELETE FROM 语句，需确认删除逻辑",
+        "请检查删除条件是否正确，是否可能导致意外数据丢失",
+    ),
+    (
+        "chmod 777", RiskLevel.HIGH, RiskCategory.SECURITY,
+        "检测到 chmod 777，存在权限过度开放风险",
+        "避免使用 777 权限，使用最小必要权限原则（如 644 或 755）",
+    ),
+]
+
+
+def detect_keyword_risks(files: list[FileChange]) -> list[ReviewRisk]:
+    risks: list[ReviewRisk] = []
+    for f in files:
+        patch = f.patch
+        if not patch:
+            continue
+
+        added_lines = _extract_added_lines(patch)
+        if not added_lines:
+            continue
+
+        matched_keywords: set[str] = set()
+        for keyword, level, category, message, suggestion in _KEYWORD_RULES:
+            if keyword in matched_keywords:
+                continue
+            kw_lower = keyword.lower()
+            for line in added_lines:
+                if kw_lower in line.lower():
+                    matched_keywords.add(keyword)
+                    risks.append(ReviewRisk(
+                        file=f.filename,
+                        risk_level=level,
+                        source=RiskSource.RULE,
+                        category=category,
+                        message=f"{message}（命中关键词：{keyword}）",
+                        suggestion=suggestion,
+                    ))
+                    break
+
+    return risks
+
+
+def _extract_added_lines(patch: str) -> list[str]:
+    return [line[1:] for line in patch.split("\n") if line.startswith("+") and not line.startswith("+++")]

@@ -1,6 +1,6 @@
 from ai_pr_review.github.models import FileChange, FileStatus
 from ai_pr_review.review.models import RiskCategory, RiskLevel, RiskSource
-from ai_pr_review.review.risk_rules import detect_path_risks
+from ai_pr_review.review.risk_rules import detect_keyword_risks, detect_path_risks
 
 
 class TestDetectPathRisks:
@@ -91,3 +91,103 @@ class TestDetectPathRisks:
         ]
         risks = detect_path_risks(files)
         assert len(risks) == 1
+
+
+class TestDetectKeywordRisks:
+    def test_empty_files(self):
+        assert detect_keyword_risks([]) == []
+
+    def test_eval_detected(self):
+        files = [
+            FileChange(
+                filename="src/calc.py",
+                status=FileStatus.MODIFIED,
+                additions=2, deletions=1, changes=3,
+                patch="@@ -1,3 +1,4 @@\n import math\n+result = eval(user_input)\n-return 0\n+return result",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 1
+        r = risks[0]
+        assert r.file == "src/calc.py"
+        assert r.risk_level == RiskLevel.HIGH
+        assert r.source == RiskSource.RULE
+        assert r.category == RiskCategory.SECURITY
+        assert "eval" in r.message
+
+    def test_shell_true_detected(self):
+        files = [
+            FileChange(
+                filename="src/runner.py",
+                status=FileStatus.MODIFIED,
+                additions=3, deletions=0, changes=3,
+                patch="@@ -5,0 +5,3 @@\n+import subprocess\n+subprocess.call(cmd, shell=True)",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 2  # subprocess + shell=True
+        categories = {r.category for r in risks}
+        assert categories == {RiskCategory.SECURITY}
+
+    def test_secret_keyword(self):
+        files = [
+            FileChange(
+                filename="config.py",
+                status=FileStatus.MODIFIED,
+                additions=1, deletions=0, changes=1,
+                patch="@@ -1,3 +1,4 @@\n+API_SECRET = 'sk-abc123'",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 1
+        assert "secret" in risks[0].message.lower()
+
+    def test_no_patch_skipped(self):
+        files = [
+            FileChange(
+                filename="img/logo.png",
+                status=FileStatus.ADDED,
+                additions=0, deletions=0, changes=0,
+                patch="",
+                is_binary=True,
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 0
+
+    def test_no_keywords_in_patch(self):
+        files = [
+            FileChange(
+                filename="src/clean.py",
+                status=FileStatus.MODIFIED,
+                additions=2, deletions=1, changes=3,
+                patch="@@ -1,3 +1,4 @@\n+def add(a, b):\n+    return a + b",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 0
+
+    def test_keyword_not_in_context_lines(self):
+        files = [
+            FileChange(
+                filename="src/test.py",
+                status=FileStatus.MODIFIED,
+                additions=1, deletions=0, changes=1,
+                patch="@@ -5,3 +5,4 @@\n import os\n os.getcwd()\n+new_code()",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 0
+
+    def test_chmod_777_detected(self):
+        files = [
+            FileChange(
+                filename="deploy.sh",
+                status=FileStatus.MODIFIED,
+                additions=1, deletions=0, changes=1,
+                patch="@@ -1,3 +1,4 @@\n+chmod 777 /var/www",
+            )
+        ]
+        risks = detect_keyword_risks(files)
+        assert len(risks) == 1
+        assert risks[0].category == RiskCategory.SECURITY
