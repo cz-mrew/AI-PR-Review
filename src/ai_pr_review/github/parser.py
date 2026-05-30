@@ -1,5 +1,7 @@
 import re
-from .models import FileChange, FileStatus, DiffHunk, DiffLine
+from urllib.parse import urlparse
+
+from .models import FileChange, FileStatus, DiffHunk, DiffLine, GitHubPRUrl
 
 HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
 
@@ -10,6 +12,30 @@ SKIP_EXTENSIONS = {
     ".woff", ".woff2", ".ttf", ".eot", ".otf", ".min.js", ".min.css",
     ".pyc", ".class", ".o", ".so", ".dll", ".exe", ".bin",
 }
+
+
+def parse_github_pr_url(pr_url: str) -> GitHubPRUrl:
+    parsed = urlparse(pr_url.strip())
+    path_parts = [part for part in parsed.path.split("/") if part]
+
+    if (
+        parsed.scheme not in {"http", "https"}
+        or parsed.netloc.lower() != "github.com"
+        or len(path_parts) != 4
+        or path_parts[2] != "pull"
+    ):
+        raise ValueError(f"Invalid GitHub PR URL: {pr_url}")
+
+    try:
+        pull_number = int(path_parts[3])
+    except ValueError as exc:
+        raise ValueError(f"Invalid GitHub PR URL: {pr_url}") from exc
+
+    return GitHubPRUrl(
+        owner=path_parts[0],
+        repo=path_parts[1],
+        pull_number=pull_number,
+    )
 
 
 def is_binary_or_skip(filename: str) -> bool:

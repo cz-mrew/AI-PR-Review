@@ -56,6 +56,13 @@ class FileChange:
 
 
 @dataclass
+class GitHubPRUrl:
+    owner: str
+    repo: str
+    pull_number: int
+
+
+@dataclass
 class PRInfo:
     title: str
     author: str

@@ -2,10 +2,9 @@ import os
 import re
 import httpx
 from .models import PRInfo, FileChange
-from .parser import parse_file_change
+from .parser import parse_file_change, parse_github_pr_url
 
 GITHUB_API_BASE = "https://api.github.com"
-PR_URL_RE = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/pull/(\d+)/?.*$")
 
 SKIP_PATTERNS = [
     r"^vendor/",
@@ -33,10 +32,8 @@ class GitHubClient:
 
     @staticmethod
     def parse_pr_url(pr_url: str) -> tuple[str, str, int]:
-        m = PR_URL_RE.match(pr_url.strip())
-        if not m:
-            raise ValueError(f"Invalid GitHub PR URL: {pr_url}")
-        return m.group(1), m.group(2), int(m.group(3))
+        parsed = parse_github_pr_url(pr_url)
+        return parsed.owner, parsed.repo, parsed.pull_number
 
     def fetch_pr(self, pr_url: str) -> PRInfo:
         owner, repo, number = self.parse_pr_url(pr_url)
