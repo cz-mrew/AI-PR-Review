@@ -1,5 +1,5 @@
 from ai_pr_review.github.client import GITHUB_API_BASE, GitHubClient
-from ai_pr_review.github.models import GitHubPullRequest, GitHubUser
+from ai_pr_review.github.models import GitHubChangedFile, GitHubPullRequest, GitHubUser
 
 
 class FakeResponse:
@@ -127,3 +127,53 @@ def test_get_pull_request_returns_mapped_model(monkeypatch):
     assert pull_request.head_sha == "abc123"
     assert pull_request.created_at == "2026-05-30T00:00:00Z"
     assert pull_request.updated_at == "2026-05-30T01:00:00Z"
+
+
+def test_get_pull_request_files_returns_changed_file_models(monkeypatch):
+    calls = []
+    mock_files_json = [
+        {
+            "filename": "src/app.py",
+            "status": "modified",
+            "additions": 12,
+            "deletions": 3,
+            "changes": 15,
+            "patch": "@@ -1,1 +1,1 @@\n-old\n+new",
+            "raw_url": "https://github.com/owner/repo/raw/main/src/app.py",
+            "blob_url": "https://github.com/owner/repo/blob/main/src/app.py",
+        },
+        {
+            "filename": "assets/logo.png",
+            "status": "added",
+            "additions": 0,
+            "deletions": 0,
+            "changes": 0,
+            "raw_url": "https://github.com/owner/repo/raw/main/assets/logo.png",
+            "blob_url": "https://github.com/owner/repo/blob/main/assets/logo.png",
+        },
+    ]
+
+    def fake_get(self, path, params=None):
+        calls.append({"path": path, "params": params})
+        return mock_files_json
+
+    monkeypatch.setattr(GitHubClient, "_get", fake_get)
+
+    client = GitHubClient(github_token="")
+    files = client.get_pull_request_files("owner", "repo", 123)
+
+    assert calls == [{"path": "repos/owner/repo/pulls/123/files", "params": None}]
+    assert len(files) == 2
+    assert all(isinstance(file, GitHubChangedFile) for file in files)
+
+    assert files[0].filename == "src/app.py"
+    assert files[0].status == "modified"
+    assert files[0].additions == 12
+    assert files[0].deletions == 3
+    assert files[0].changes == 15
+    assert files[0].patch == "@@ -1,1 +1,1 @@\n-old\n+new"
+    assert files[0].raw_url == "https://github.com/owner/repo/raw/main/src/app.py"
+    assert files[0].blob_url == "https://github.com/owner/repo/blob/main/src/app.py"
+
+    assert files[1].filename == "assets/logo.png"
+    assert files[1].patch is None
