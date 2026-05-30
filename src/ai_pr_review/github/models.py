@@ -63,6 +63,34 @@ class GitHubPRUrl:
 
 
 @dataclass
+class GitHubPRRef:
+    owner: str
+    repo: str
+    pull_number: int
+
+
+@dataclass
+class GitHubUser:
+    login: str
+    html_url: str
+
+
+@dataclass
+class GitHubPullRequest:
+    number: int
+    title: str
+    body: str | None
+    state: str
+    html_url: str
+    user: GitHubUser
+    base_branch: str
+    head_branch: str
+    head_sha: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass
 class PRInfo:
     title: str
     author: str
