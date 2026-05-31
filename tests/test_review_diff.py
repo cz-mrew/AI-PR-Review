@@ -2,6 +2,11 @@ from ai_pr_review.github.models import FileChange, FileStatus
 from ai_pr_review.review.diff import build_diff_context
 
 
+class FakeSettings:
+    max_diff_chars = 1_000
+    max_patch_chars_per_file = 100
+
+
 class TestBuildDiffContext:
     def test_single_modified_file(self):
         files = [
@@ -23,6 +28,7 @@ class TestBuildDiffContext:
         assert r["deletions"] == 2
         assert r["changes"] == 12
         assert r["is_analyzable"] is True
+        assert r["is_truncated"] is False
         assert r["skip_reason"] is None
         assert "def foo" in r["patch"]
 
@@ -41,6 +47,7 @@ class TestBuildDiffContext:
         result = build_diff_context(files)
         r = result[0]
         assert r["is_analyzable"] is False
+        assert r["is_truncated"] is False
         assert r["skip_reason"] == "empty_patch_or_binary_file"
         assert r["patch"] == ""
 
@@ -58,6 +65,7 @@ class TestBuildDiffContext:
         result = build_diff_context(files)
         r = result[0]
         assert r["is_analyzable"] is False
+        assert r["is_truncated"] is False
         assert r["skip_reason"] == "empty_patch_or_binary_file"
 
     def test_multiple_files_mixed(self):
@@ -125,3 +133,27 @@ class TestBuildDiffContext:
         r = result[0]
         assert r["status"] == "renamed"
         assert r["is_analyzable"] is True
+
+    def test_long_patch_is_truncated_and_marked(self, monkeypatch):
+        monkeypatch.setattr("ai_pr_review.review.diff.get_settings", lambda: FakeSettings())
+        long_patch = "@@ -1,1 +1,1 @@\n" + ("+changed line\n" * 20)
+        files = [
+            FileChange(
+                filename="src/large.py",
+                status=FileStatus.MODIFIED,
+                additions=20,
+                deletions=0,
+                changes=20,
+                patch=long_patch,
+            )
+        ]
+
+        result = build_diff_context(files)
+        r = result[0]
+
+        assert r["filename"] == "src/large.py"
+        assert r["additions"] == 20
+        assert r["patch"] == long_patch[:FakeSettings.max_patch_chars_per_file]
+        assert r["patch"].startswith("@@ -1,1 +1,1 @@")
+        assert len(r["patch"]) == FakeSettings.max_patch_chars_per_file
+        assert r["is_truncated"] is True
