@@ -6,6 +6,9 @@ from main import create_app
 class FakeReviewService:
     called_with: str | None = None
 
+    def __init__(self, github_client=None) -> None:
+        pass
+
     def review(self, pr_url: str) -> dict:
         self.__class__.called_with = pr_url
         return {

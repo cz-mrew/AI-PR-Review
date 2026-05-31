@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from ..github.client import GitHubClient
+from ..review.service import ReviewService
 from ..schemas import ApiResponse
 
 
@@ -16,22 +18,11 @@ class ReviewResponse(BaseModel):
     review_suggestions: str | None
 
 
-class ReviewService:
-    def review(self, pr_url: str) -> ReviewResponse:
-        return ReviewResponse(
-            pr={"url": pr_url},
-            summary={},
-            ai_summary=None,
-            risks=[],
-            review_suggestions=None,
-        )
-
-
 router = APIRouter()
 
 
 def get_review_service() -> ReviewService:
-    return ReviewService()
+    return ReviewService(GitHubClient())
 
 
 @router.post("/review", response_model=ApiResponse[ReviewResponse])

@@ -5,11 +5,17 @@ from main import create_app
 
 
 class InvalidUrlReviewService:
+    def __init__(self, github_client=None) -> None:
+        pass
+
     def review(self, pr_url: str) -> dict:
         raise InvalidPRUrlError(f"Unsupported PR URL: {pr_url}")
 
 
 class GitHubErrorReviewService:
+    def __init__(self, github_client=None) -> None:
+        pass
+
     def review(self, pr_url: str) -> dict:
         raise GitHubAPIError("GitHub request failed with status 500")
 
