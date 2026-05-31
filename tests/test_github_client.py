@@ -1,5 +1,5 @@
 from ai_pr_review.github.client import GITHUB_API_BASE, GitHubClient
-from ai_pr_review.github.models import GitHubChangedFile, GitHubPullRequest, GitHubUser
+from ai_pr_review.github.models import GitHubChangedFile, GitHubCommit, GitHubPullRequest, GitHubUser
 
 
 class FakeResponse:
@@ -177,3 +177,52 @@ def test_get_pull_request_files_returns_changed_file_models(monkeypatch):
 
     assert files[1].filename == "assets/logo.png"
     assert files[1].patch is None
+
+
+def test_get_pull_request_commits_returns_commit_models(monkeypatch):
+    calls = []
+    mock_commits_json = [
+        {
+            "sha": "abc123",
+            "commit": {
+                "message": "Add review API models",
+                "author": {
+                    "name": "Alice",
+                    "email": "alice@example.com",
+                },
+            },
+        },
+        {
+            "sha": "def456",
+            "commit": {
+                "message": "Add commit tests",
+                "author": {
+                    "name": "Bob",
+                    "email": "bob@example.com",
+                },
+            },
+        },
+    ]
+
+    def fake_get(self, path, params=None):
+        calls.append({"path": path, "params": params})
+        return mock_commits_json
+
+    monkeypatch.setattr(GitHubClient, "_get", fake_get)
+
+    client = GitHubClient(github_token="")
+    commits = client.get_pull_request_commits("owner", "repo", 123)
+
+    assert calls == [{"path": "repos/owner/repo/pulls/123/commits", "params": None}]
+    assert len(commits) == 2
+    assert all(isinstance(commit, GitHubCommit) for commit in commits)
+
+    assert commits[0].sha == "abc123"
+    assert commits[0].message == "Add review API models"
+    assert commits[0].author_name == "Alice"
+    assert commits[0].author_email == "alice@example.com"
+
+    assert commits[1].sha == "def456"
+    assert commits[1].message == "Add commit tests"
+    assert commits[1].author_name == "Bob"
+    assert commits[1].author_email == "bob@example.com"
