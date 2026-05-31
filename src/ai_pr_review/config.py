@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
     llm_model: str = Field(default="gpt-4o-mini", alias="LLM_MODEL")
     request_timeout: float = Field(default=30.0, alias="REQUEST_TIMEOUT")
+    max_diff_chars: int = Field(default=120_000, alias="MAX_DIFF_CHARS")
+    max_patch_chars_per_file: int = Field(default=20_000, alias="MAX_PATCH_CHARS_PER_FILE")
 
     model_config = SettingsConfigDict(
         env_file=".env",
