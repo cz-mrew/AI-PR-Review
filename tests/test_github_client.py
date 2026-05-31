@@ -182,7 +182,6 @@ def test_get_pull_request_files_returns_changed_file_models(monkeypatch):
     assert files[1].patch is None
 
 
-<<<<<<< HEAD
 def test_get_pull_request_files_fetches_all_pages(monkeypatch):
     calls = []
     first_page = [
@@ -210,7 +209,38 @@ def test_get_pull_request_files_fetches_all_pages(monkeypatch):
             "blob_url": f"https://github.com/owner/repo/blob/main/tests/test_file_{index}.py",
         }
         for index in range(20)
-=======
+    ]
+
+    def fake_get(self, path, params=None):
+        calls.append({"path": path, "params": params})
+        if params["page"] == 1:
+            return first_page
+        if params["page"] == 2:
+            return second_page
+        return []
+
+    monkeypatch.setattr(GitHubClient, "_get", fake_get)
+
+    client = GitHubClient(github_token="")
+    files = client.get_pull_request_files("owner", "repo", 123)
+
+    assert len(files) == 120
+    assert calls == [
+        {
+            "path": "repos/owner/repo/pulls/123/files",
+            "params": {"per_page": 100, "page": 1},
+        },
+        {
+            "path": "repos/owner/repo/pulls/123/files",
+            "params": {"per_page": 100, "page": 2},
+        },
+    ]
+    assert files[0].filename == "src/file_0.py"
+    assert files[99].filename == "src/file_99.py"
+    assert files[100].filename == "tests/test_file_0.py"
+    assert files[119].filename == "tests/test_file_19.py"
+
+
 def test_get_pull_request_commits_returns_commit_models(monkeypatch):
     calls = []
     mock_commits_json = [
@@ -234,43 +264,15 @@ def test_get_pull_request_commits_returns_commit_models(monkeypatch):
                 },
             },
         },
->>>>>>> upstream/main
     ]
 
     def fake_get(self, path, params=None):
         calls.append({"path": path, "params": params})
-<<<<<<< HEAD
-        if params["page"] == 1:
-            return first_page
-        if params["page"] == 2:
-            return second_page
-        return []
-=======
         return mock_commits_json
->>>>>>> upstream/main
 
     monkeypatch.setattr(GitHubClient, "_get", fake_get)
 
     client = GitHubClient(github_token="")
-<<<<<<< HEAD
-    files = client.get_pull_request_files("owner", "repo", 123)
-
-    assert len(files) == 120
-    assert calls == [
-        {
-            "path": "repos/owner/repo/pulls/123/files",
-            "params": {"per_page": 100, "page": 1},
-        },
-        {
-            "path": "repos/owner/repo/pulls/123/files",
-            "params": {"per_page": 100, "page": 2},
-        },
-    ]
-    assert files[0].filename == "src/file_0.py"
-    assert files[99].filename == "src/file_99.py"
-    assert files[100].filename == "tests/test_file_0.py"
-    assert files[119].filename == "tests/test_file_19.py"
-=======
     commits = client.get_pull_request_commits("owner", "repo", 123)
 
     assert calls == [{"path": "repos/owner/repo/pulls/123/commits", "params": None}]
@@ -286,4 +288,3 @@ def test_get_pull_request_commits_returns_commit_models(monkeypatch):
     assert commits[1].message == "Add commit tests"
     assert commits[1].author_name == "Bob"
     assert commits[1].author_email == "bob@example.com"
->>>>>>> upstream/main
