@@ -54,6 +54,13 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    def _post(self, path: str, json: dict | None = None) -> dict | list:
+        url = f"{GITHUB_API_BASE}/{path.lstrip('/')}"
+        with httpx.Client(timeout=30) as client:
+            response = client.post(url, headers=self._headers, json=json)
+            response.raise_for_status()
+            return response.json()
+
     def get_pull_request(self, owner: str, repo: str, pull_number: int) -> GitHubPullRequest:
         pr_data = self._get(f"repos/{owner}/{repo}/pulls/{pull_number}")
 
@@ -116,6 +123,13 @@ class GitHubClient:
             )
             for commit_data in commits_data
         ]
+
+    def create_issue_comment(self, owner: str, repo: str, issue_number: int, body: str) -> dict:
+        result = self._post(
+            f"repos/{owner}/{repo}/issues/{issue_number}/comments",
+            json={"body": body},
+        )
+        return result if isinstance(result, dict) else {"comments": result}
 
     def fetch_pr(self, pr_url: str) -> PRInfo:
         owner, repo, number = self.parse_pr_url(pr_url)
