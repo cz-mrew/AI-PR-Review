@@ -1,6 +1,6 @@
 from ai_pr_review.github.models import FileChange, FileStatus
 from ai_pr_review.review.models import RiskCategory, RiskLevel, RiskSource
-from ai_pr_review.review.risk_rules import detect_keyword_risks, detect_path_risks
+from ai_pr_review.review.risk_rules import detect_keyword_risks, detect_path_risks, detect_scale_risks
 
 
 class TestDetectPathRisks:
@@ -191,3 +191,58 @@ class TestDetectKeywordRisks:
         risks = detect_keyword_risks(files)
         assert len(risks) == 1
         assert risks[0].category == RiskCategory.SECURITY
+
+
+class TestDetectScaleRisks:
+    def _make_file(self, filename: str, changes: int) -> FileChange:
+        return FileChange(
+            filename=filename,
+            status=FileStatus.MODIFIED,
+            additions=changes, deletions=0, changes=changes,
+            patch="dummy",
+        )
+
+    def test_empty_files(self):
+        assert detect_scale_risks([]) == []
+
+    def test_small_pr_no_risks(self):
+        files = [self._make_file(f"src/f{i}.py", 10) for i in range(5)]
+        risks = detect_scale_risks(files)
+        assert len(risks) == 0
+
+    def test_medium_file_count(self):
+        files = [self._make_file(f"src/f{i}.py", 10) for i in range(25)]
+        risks = detect_scale_risks(files)
+        assert len(risks) == 1
+        assert risks[0].risk_level == RiskLevel.MEDIUM
+        assert risks[0].category == RiskCategory.SCALE
+
+    def test_high_file_count(self):
+        files = [self._make_file(f"src/f{i}.py", 10) for i in range(55)]
+        risks = detect_scale_risks(files)
+        assert any(r.risk_level == RiskLevel.HIGH for r in risks)
+
+    def test_high_total_changes(self):
+        files = [self._make_file(f"src/f{i}.py", 200) for i in range(6)]
+        risks = detect_scale_risks(files)
+        assert any("1000" in r.message for r in risks)
+
+    def test_single_file_too_large(self):
+        files = [
+            FileChange(
+                filename="src/big.py",
+                status=FileStatus.MODIFIED,
+                additions=350, deletions=0, changes=350,
+                patch="dummy",
+            )
+        ]
+        risks = detect_scale_risks(files)
+        assert len(risks) == 1
+        assert risks[0].risk_level == RiskLevel.HIGH
+        assert "big.py" in risks[0].message
+
+    def test_combined_risks(self):
+        files = [self._make_file(f"src/f{i}.py", 50) for i in range(60)]
+        risks = detect_scale_risks(files)
+        # file_count > 50 (high) + total_changes > 1000 (high)
+        assert len(risks) >= 2

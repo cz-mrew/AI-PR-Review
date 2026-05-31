@@ -166,3 +166,59 @@ def detect_keyword_risks(files: list[FileChange]) -> list[ReviewRisk]:
 
 def _extract_added_lines(patch: str) -> list[str]:
     return [line[1:] for line in patch.split("\n") if line.startswith("+") and not line.startswith("+++")]
+
+
+def detect_scale_risks(files: list[FileChange]) -> list[ReviewRisk]:
+    risks: list[ReviewRisk] = []
+
+    if not files:
+        return risks
+
+    total_changes = sum(f.changes for f in files)
+    file_count = len(files)
+
+    if file_count > 50:
+        risks.append(ReviewRisk(
+            file="",
+            risk_level=RiskLevel.HIGH,
+            source=RiskSource.RULE,
+            category=RiskCategory.SCALE,
+            message=f"PR 变更文件数 ({file_count}) 超过 50 个，Review 成本高",
+            suggestion="强烈建议将 PR 拆分为多个较小的、功能独立的 PR，降低回归风险",
+            confidence=Confidence.HIGH,
+        ))
+    elif file_count > 20:
+        risks.append(ReviewRisk(
+            file="",
+            risk_level=RiskLevel.MEDIUM,
+            source=RiskSource.RULE,
+            category=RiskCategory.SCALE,
+            message=f"PR 变更文件数 ({file_count}) 超过 20 个，建议关注 Review 范围",
+            suggestion="建议考虑是否可以拆分为多个 PR，以便更专注地审查每个变更",
+            confidence=Confidence.MEDIUM,
+        ))
+
+    if total_changes > 1000:
+        risks.append(ReviewRisk(
+            file="",
+            risk_level=RiskLevel.HIGH,
+            source=RiskSource.RULE,
+            category=RiskCategory.SCALE,
+            message=f"PR 总变更行数 ({total_changes}) 超过 1000 行，回归风险较高",
+            suggestion="强烈建议将 PR 拆分为多个较小的提交，降低测试和审查难度",
+            confidence=Confidence.HIGH,
+        ))
+
+    for f in files:
+        if f.changes > 300:
+            risks.append(ReviewRisk(
+                file=f.filename,
+                risk_level=RiskLevel.HIGH,
+                source=RiskSource.RULE,
+                category=RiskCategory.SCALE,
+                message=f"文件 {f.filename} 变更行数 ({f.changes}) 超过 300 行",
+                suggestion="建议将大文件的变更拆分为多次提交，或说明为何需要一次性修改大量代码",
+                confidence=Confidence.HIGH,
+            ))
+
+    return risks
