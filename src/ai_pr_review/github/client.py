@@ -6,6 +6,8 @@ from .models import FileChange, GitHubChangedFile, GitHubPullRequest, GitHubUser
 from .parser import parse_file_change, parse_github_pr_url
 
 GITHUB_API_BASE = "https://api.github.com"
+GITHUB_PER_PAGE = 100
+GITHUB_MAX_PAGES = 100
 
 SKIP_PATTERNS = [
     r"^vendor/",
@@ -70,21 +72,30 @@ class GitHubClient:
         )
 
     def get_pull_request_files(self, owner: str, repo: str, pull_number: int) -> list[GitHubChangedFile]:
-        files_data = self._get(f"repos/{owner}/{repo}/pulls/{pull_number}/files")
+        path = f"repos/{owner}/{repo}/pulls/{pull_number}/files"
+        files: list[GitHubChangedFile] = []
 
-        return [
-            GitHubChangedFile(
-                filename=file_data.get("filename", ""),
-                status=file_data.get("status", ""),
-                additions=file_data.get("additions", 0),
-                deletions=file_data.get("deletions", 0),
-                changes=file_data.get("changes", 0),
-                patch=file_data.get("patch"),
-                raw_url=file_data.get("raw_url", ""),
-                blob_url=file_data.get("blob_url", ""),
-            )
-            for file_data in files_data
-        ]
+        for page in range(1, GITHUB_MAX_PAGES + 1):
+            page_data = self._get(path, params={"per_page": GITHUB_PER_PAGE, "page": page})
+            files.extend(self._map_changed_file(file_data) for file_data in page_data)
+
+            if len(page_data) < GITHUB_PER_PAGE:
+                break
+
+        return files
+
+    @staticmethod
+    def _map_changed_file(file_data: dict) -> GitHubChangedFile:
+        return GitHubChangedFile(
+            filename=file_data.get("filename", ""),
+            status=file_data.get("status", ""),
+            additions=file_data.get("additions", 0),
+            deletions=file_data.get("deletions", 0),
+            changes=file_data.get("changes", 0),
+            patch=file_data.get("patch"),
+            raw_url=file_data.get("raw_url", ""),
+            blob_url=file_data.get("blob_url", ""),
+        )
 
     def fetch_pr(self, pr_url: str) -> PRInfo:
         owner, repo, number = self.parse_pr_url(pr_url)
