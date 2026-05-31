@@ -7,6 +7,9 @@ class FakeReviewService:
     called_with: str | None = None
     publish_called = False
 
+    def __init__(self, github_client=None) -> None:
+        pass
+
     def review(self, pr_url: str) -> dict:
         self.__class__.called_with = pr_url
         return {

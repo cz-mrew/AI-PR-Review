@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from ..github.client import GitHubClient
 from ..github.comment import build_issue_comment_body
+from ..review.service import ReviewService
 from ..schemas import ApiResponse
 from ..schemas.review import ReviewRequest, ReviewResponse
 
@@ -27,7 +28,7 @@ router = APIRouter()
 
 
 def get_review_service() -> ReviewService:
-    return ReviewService()
+    return ReviewService(GitHubClient())
 
 
 @router.post("/review", response_model=ApiResponse[ReviewResponse])

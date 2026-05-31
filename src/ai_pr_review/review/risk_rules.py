@@ -78,6 +78,25 @@ def detect_path_risks(files: list[FileChange]) -> list[ReviewRisk]:
     return risks
 
 
+def detect_rule_based_risks(files: list[FileChange]) -> list[ReviewRisk]:
+    all_risks = (
+        detect_path_risks(files)
+        + detect_keyword_risks(files)
+        + detect_scale_risks(files)
+    )
+
+    seen: set[tuple[str, str, str]] = set()
+    deduped: list[ReviewRisk] = []
+    for r in all_risks:
+        key = (r.file, r.category.value, r.message)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(r)
+
+    return deduped
+
+
 _KEYWORD_RULES: list[tuple[str, RiskLevel, RiskCategory, str, str]] = [
     (
         "exec(", RiskLevel.HIGH, RiskCategory.SECURITY,

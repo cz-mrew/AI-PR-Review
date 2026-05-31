@@ -1,6 +1,11 @@
 from ai_pr_review.github.models import FileChange, FileStatus
 from ai_pr_review.review.models import RiskCategory, RiskLevel, RiskSource
-from ai_pr_review.review.risk_rules import detect_keyword_risks, detect_path_risks, detect_scale_risks
+from ai_pr_review.review.risk_rules import (
+    detect_keyword_risks,
+    detect_path_risks,
+    detect_rule_based_risks,
+    detect_scale_risks,
+)
 
 
 class TestDetectPathRisks:
@@ -246,3 +251,55 @@ class TestDetectScaleRisks:
         risks = detect_scale_risks(files)
         # file_count > 50 (high) + total_changes > 1000 (high)
         assert len(risks) >= 2
+
+
+class TestDetectRuleBasedRisks:
+    def test_empty_files(self):
+        assert detect_rule_based_risks([]) == []
+
+    def test_combines_all_rule_types(self):
+        files = [
+            FileChange(
+                filename="src/auth/login.py",
+                status=FileStatus.MODIFIED,
+                additions=1, deletions=0, changes=1,
+                patch="@@ -1 +1,2 @@\n+result = eval(user_input)",
+            )
+        ]
+        risks = detect_rule_based_risks(files)
+        # path risk (auth) + keyword risk (eval)
+        assert len(risks) >= 2
+        sources = {r.source for r in risks}
+        assert {RiskSource.RULE} == sources
+
+    def test_deduplicates_identical_risks(self):
+        # A file that would trigger the same path risk twice shouldn't duplicate
+        files = [
+            FileChange(
+                filename="src/auth/login.py",
+                status=FileStatus.MODIFIED,
+                additions=5, deletions=1, changes=6,
+                patch="dummy",
+            ),
+            FileChange(
+                filename="src/auth/logout.py",
+                status=FileStatus.MODIFIED,
+                additions=3, deletions=0, changes=3,
+                patch="dummy",
+            ),
+        ]
+        risks = detect_rule_based_risks(files)
+        # Each file gets a path risk, but messages differ by filename
+        assert len(risks) >= 2
+
+    def test_no_duplicate_risks(self):
+        files = [
+            FileChange(
+                filename="src/clean.py",
+                status=FileStatus.MODIFIED,
+                additions=2, deletions=1, changes=3,
+                patch="@@ -1,3 +1,4 @@\n+def add(a, b):\n+    return a + b",
+            )
+        ]
+        risks = detect_rule_based_risks(files)
+        assert len(risks) == 0
