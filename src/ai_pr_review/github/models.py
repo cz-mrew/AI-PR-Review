@@ -103,6 +103,14 @@ class GitHubChangedFile:
 
 
 @dataclass
+class GitHubCommit:
+    sha: str
+    message: str
+    author_name: str
+    author_email: str
+
+
+@dataclass
 class PRInfo:
     title: str
     author: str
